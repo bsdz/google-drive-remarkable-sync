@@ -1,31 +1,40 @@
 class RemarkableAPI {
 
-  constructor(deviceToken = null, oneTimeCode = null) {
+  constructor(deviceId = null, deviceToken = null, oneTimeCode = null) {
     // oneTimeCode from https://my.remarkable.com/connect/mobile
     if (deviceToken === null && oneTimeCode === null) {
       throw "Need at least either device-token or one-time-code";
     }
 
+    if (deviceId === null) {
+      Logger.log("Creating new Remarkable device id..");
+      this.deviceId = Utilities.getUuid();
+    }
+    else {
+      Logger.log("Using existing Remarkable device id..");
+      this.deviceId = deviceId;
+    }    
+    
     if (deviceToken === null) {
       Logger.log("Requesting new Remarkable device token from one time code..");
-      this.deviceToken = this.constructor._getDeviceToken(oneTimeCode);
+      this.deviceToken = this.constructor._getDeviceToken(this.deviceId, oneTimeCode);
     }
     else {
       Logger.log("Using existing Remarkable device token..");
       this.deviceToken = deviceToken;
     }
-
+    
     this.userToken = this.constructor._getUserToken(this.deviceToken);
     this.storageHost = this.constructor._getStorageHost(this.userToken);
   }
 
   // https://github.com/splitbrain/ReMarkableAPI/wiki/Authentication
 
-  static _getDeviceToken(oneTimeCode) {
+  static _getDeviceToken(deviceId, oneTimeCode) {
     let data = {
       "code": oneTimeCode, // one-time code from website
       "deviceDesc": "desktop-windows",
-      "deviceID": "29a64bd1-9fa3-4ff4-8849-3d8d527b93f2"
+      "deviceID": deviceId
     };
     let options = {
       'method': 'post',

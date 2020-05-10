@@ -39,7 +39,7 @@ function example_get_document_info() {
   // let rapi = sync.rApiClient;
   // otherwise use one time code from https://my.remarkable.com/connect/mobile
   let rOneTimeCode = "abcdwxyz"; 
-  let rapi = new RemarkableAPI(null, rOneTimeCode);
+  let rapi = new RemarkableAPI(null, null, rOneTimeCode);
   // example doc with uuid
   let docs = rapi.listDocs('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', true);
 }
@@ -50,7 +50,7 @@ function example_delete_all_documents() {
   // let rapi = sync.rApiClient;
   // otherwise use one time code from https://my.remarkable.com/connect/mobile
   let rOneTimeCode = "abcdwxyz"; 
-  let rapi = new RemarkableAPI(null, rOneTimeCode);
+  let rapi = new RemarkableAPI(null, null, rOneTimeCode);
   let allDocs = rapi.listDocs();
   // delete all except at top level
   let deleteDocs = allDocs.filter((r) => r["Parent"] != "");

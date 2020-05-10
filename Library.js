@@ -10,3 +10,13 @@ function syncGoogleDriveWithRemarkableCloud(rOneTimeCode, gdFolderSearchParams, 
   let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, rRootFolder, gdSkipFolders);
   sync.run();
 }
+
+
+/**
+ * Resets the device id and token forcing reinitialization of Remarkable Cloud authorization.
+ */
+function resetRemarkableDevice() {
+  let userProps = PropertiesService.getUserProperties();
+  userProps.deleteProperty(rDeviceTokenKey);
+  userProps.deleteProperty(rDeviceIdKey);
+}

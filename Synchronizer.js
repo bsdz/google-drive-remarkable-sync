@@ -21,6 +21,9 @@ const dictPop = (obj, key, def) => {
   }
 }
 
+const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
+const rDeviceIdKey = "__REMARKABLE_DEVICE_ID__";
+
 /*  Main work here. Walks Google Drive then uploads 
  folder and files to Remarkable cloud storage. Currently
  only uploads PDFs. There appears to be a limitation
@@ -67,18 +70,19 @@ class Synchronizer {
     this.gdIdToUUID = this.userProps.getProperties();
     
     // pop off keys not used for storing id/uuid mappings
-    const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
-    let rDeviceToken = dictPop(this.gdIdToUUID, rDeviceTokenKey, null)
+    let rDeviceToken = dictPop(this.gdIdToUUID, rDeviceTokenKey, null);
+    let rDeviceId = dictPop(this.gdIdToUUID, rDeviceIdKey, null);    
 
     // for storing reverse map
     this.UUIDToGdId = reverseDict(this.gdIdToUUID);
     
     // initialize remarkable api
     if (rDeviceToken === null) {
-      this.rApiClient = new RemarkableAPI(null, rOneTimeCode);
+      this.rApiClient = new RemarkableAPI(null, null, rOneTimeCode);
       this.userProps.setProperty(rDeviceTokenKey, this.rApiClient.deviceToken);
+      this.userProps.setProperty(rDeviceIdKey, this.rApiClient.deviceId);
     } else {
-      this.rApiClient = new RemarkableAPI(rDeviceToken);
+      this.rApiClient = new RemarkableAPI(rDeviceId, rDeviceToken);
     }
     
     // prep some common vars
