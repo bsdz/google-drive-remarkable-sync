@@ -1,5 +1,9 @@
 # google-drive-remarkable-sync
-Apps Script library for synchronising Google Drive folder with Remarkable reader.
+Apps Script library for synchronising Google Drive folder with Remarkable cloud storage.
+
+Files kept in Remarkable's cloud storage are automatically syncronised with your Remarkable device.
+
+Thanks to splitbrain who did the [initial reverse engineering of Remarkable's cloud API](https://github.com/splitbrain/ReMarkableAPI/wiki).
 
 # Installation
 
