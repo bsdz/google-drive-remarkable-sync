@@ -6,7 +6,7 @@ function example_run_sync() {
   //let gdFolderSearchParams = "0Xxx_0XxxxX1XXX1xXXxxXXxxx0X";
   let gdFolderSearchParams = "title = 'Books' and mimeType = 'application/vnd.google-apps.folder'"
   
-  let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, "Google Drive", ["SkipFolder1", "SkipFolder2"]);
+  let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, "Google Drive", "update", ["SkipFolder1", "SkipFolder2"]);
   sync.run();
 }
 
@@ -29,7 +29,7 @@ function example_force_sync() {
 //  const forceFunc = (r, s) => r["VissibleName"] == "needs_force_push.pdf";
 //  const forceFunc = (r, s) => s["Version"] == 1;
   
-  let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, "Google Drive", [], forceFunc);
+  let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, "Google Drive", "update", [], forceFunc);
   sync.run();
 }
 

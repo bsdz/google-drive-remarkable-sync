@@ -17,12 +17,19 @@ const dictPop = (obj, key, def) => {
   } else if (def !== undefined) {
     return def;
   } else {
-    throw `key ${key} not in dictionary` 
+    throw `key ${key} not in dictionary`
   }
+}
+
+// https://stackoverflow.com/questions/7905929/how-to-test-valid-uuid-guid
+const isUUID = (uuid) => {
+  let re = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  return re.test(uuid)
 }
 
 const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
 const rDeviceIdKey = "__REMARKABLE_DEVICE_ID__";
+const availableModes = ["mirror", "update"];
 
 /*  Main work here. Walks Google Drive then uploads 
  folder and files to Remarkable cloud storage. Currently
@@ -36,7 +43,10 @@ rOneTimeCode - One time pass code from Remarkable that can typically
                be generated at https://my.remarkable.com/connect/mobile.
 gdFolderSearchParams - Google Drive search SDK string or folder id.
 rRootFolderName - The root folder in Remarkable device. Currently this
-                  must already exist on your device.
+                  must already exist on your device. This can be a remarkable
+                  folder GUID if you know it.
+syncMode - "mirror" or "update" (default). Mirroring will delete files
+           in Remarkebale cloud that have been removed from Google Drive.
 gdFolderSkipList - Optional list of folder names to skip from syncing
 forceUpdateFunc - Optional function of obj dictionaries, the first generated
                   from Google Drive, the second from Remarkable storage. The
@@ -45,8 +55,8 @@ forceUpdateFunc - Optional function of obj dictionaries, the first generated
 
 */
 class Synchronizer {
-  constructor(rOneTimeCode, gdFolderSearchParams, rRootFolderName, gdFolderSkipList = [], forceUpdateFunc=null) {
-    
+  constructor(rOneTimeCode, gdFolderSearchParams, rRootFolderName, syncMode = "update", gdFolderSkipList = [], forceUpdateFunc = null) {
+
     // try finding google folder by id first
     try {
       this.gdFolder = DriveApp.getFolderById(gdFolderSearchParams);
@@ -58,24 +68,28 @@ class Synchronizer {
         throw `Could not find Google Drive folder using search params: ${gdFolderSearchParams}`;
       }
     }
-    
-    this.rRootFolderName = rRootFolderName;
+
     this.gdFolderSkipList = gdFolderSkipList;
     this.forceUpdateFunc = forceUpdateFunc;
+    // we borrow terminology from https://freefilesync.org/manual.php?topic=synchronization-settings
+    if (!availableModes.includes(syncMode)) {
+      throw `syncMode '${syncMode}' not supported, try one from: ${availableModes}`
+    }
+    this.syncMode = syncMode;
 
     // for limits see https://developers.google.com/apps-script/guides/services/quotas
     this.userProps = PropertiesService.getUserProperties();
 
     // these are read from and cached to this.userProps
     this.gdIdToUUID = this.userProps.getProperties();
-    
+
     // pop off keys not used for storing id/uuid mappings
     let rDeviceToken = dictPop(this.gdIdToUUID, rDeviceTokenKey, null);
-    let rDeviceId = dictPop(this.gdIdToUUID, rDeviceIdKey, null);    
+    let rDeviceId = dictPop(this.gdIdToUUID, rDeviceIdKey, null);
 
     // for storing reverse map
     this.UUIDToGdId = reverseDict(this.gdIdToUUID);
-    
+
     // initialize remarkable api
     if (rDeviceToken === null) {
       this.rApiClient = new RemarkableAPI(null, null, rOneTimeCode);
@@ -84,13 +98,14 @@ class Synchronizer {
     } else {
       this.rApiClient = new RemarkableAPI(rDeviceId, rDeviceToken);
     }
-    
+
     // prep some common vars
     this.rDocList = this.rApiClient.listDocs();
+    Logger.log(`Found ${this.rDocList.length} items in Remarkable Cloud`)
 
     // for debugging - dump doc list as json in root google drive folder
-    //DriveApp.createFile('remarkable_doc_list.txt', JSON.stringify(this.rDocList));
-    
+    //DriveApp.createFile('remarkableDocList.json', JSON.stringify(this.rDocList));
+
     // create reverse dictionary
     this.rDocId2Ent = {}
     for (const [ix, doc] of this.rDocList.entries()) {
@@ -98,15 +113,19 @@ class Synchronizer {
     }
 
     // find root folder id
-    // TODO if can't find it, create folder at top level with rRootFolderName
-    let filteredDocs = this.rDocList.filter((r) => r["VissibleName"] == rRootFolderName);
-    if (filteredDocs.length > 0) {
-      this.rRootFolderId = filteredDocs[0]["ID"];
+    if (isUUID(rRootFolderName)) {
+      this.rRootFolderId = rRootFolderName;
+    } else {
+      let filteredDocs = this.rDocList.filter((r) => r["VissibleName"] == rRootFolderName);
+      if (filteredDocs.length > 0) {
+        this.rRootFolderId = filteredDocs[0]["ID"];
+      }
+      else {
+        // TODO if can't find it, create folder at top level with rRootFolderName
+        throw `Cannot find root file '${rRootFolderName}'`;
+      }
     }
-    else {
-      throw `Cannot find root file '${rRootFolderName}'`;
-    }
-
+    Logger.log(`Mapped '${rRootFolderName}' to ID '${this.rRootFolderId}'`)
   }
 
   getUUID(gdId) {
@@ -122,13 +141,13 @@ class Synchronizer {
     let uuid = this.getUUID(gdFileId);
     let gdFileObj = DriveApp.getFileById(gdFileId);
     let gdFileMT = gdFileObj.getMimeType();
-    
+
     let zipBlob = null;
-    
+
     if (gdFileMT == MimeType.FOLDER) {
       let contentBlob = Utilities.newBlob(JSON.stringify({})).setName(`${uuid}.content`);
       zipBlob = Utilities.zip([contentBlob]);
-    } else { 
+    } else {
       let gdFileExt = gdFileObj.getName().split('.').pop();
       let gdFileBlob = gdFileObj.getBlob().setName(`${uuid}.${gdFileExt}`);
       let pdBlob = Utilities.newBlob("").setName(`${uuid}.pagedata`);
@@ -145,12 +164,12 @@ class Synchronizer {
       let contentBlob = Utilities.newBlob(JSON.stringify(contentData)).setName(`${uuid}.content`);
       zipBlob = Utilities.zip([gdFileBlob, pdBlob, contentBlob]);
     }
-    
+
     //DriveApp.createFile(zipBlob.setName(`rem-${uuid}.zip`)); // to debug/examine
     return zipBlob;
   }
 
-  _walk(top, rParentId) {
+  gdWalk(top, rParentId) {
     if (this.gdFolderSkipList.includes(top.getName())) {
       Logger.log(`Skipping Google Drive sub folder '${top.getName()}'`)
       return;
@@ -184,45 +203,58 @@ class Synchronizer {
     let folders = top.getFolders();
     while (folders.hasNext()) {
       let folder = folders.next();
-      this._walk(folder, topUUID);
+      this.gdWalk(folder, topUUID);
     }
 
   }
-  
- // filter for upload list
- _needsUpdate(r) {
-   if (r["ID"] in this.rDocId2Ent) {
-     // update if parent or name differs
-     let ix =  this.rDocId2Ent[r["ID"]];
-     let s = this.rDocList[ix];
-     
-     // force update
-     if (this.forceUpdateFunc !== null && this.forceUpdateFunc(r, s)) {
-       // bump up to server version 
-       r["Version"] = s["Version"] + 1;
-       return true;
-     }  
-     
-     // verbose so can set breakpoints
-     if (s["Parent"] != r["Parent"] || s["VissibleName"] != r["VissibleName"]) {
-       // bump up to server version 
-       r["Version"] = s["Version"] + 1;
-       return true;
-     } else {
-       return false;
-     }
-   }
-   else {
-     // 50MB = 50 * 1024*1024 = 52428800
-     if (r["Type"] == "DocumentType" && r["VissibleName"].endsWith("pdf") && r["_gdSize"] <= 52428800) {
-      return true; 
-     } else if (r["Type"] == "CollectionType") {
-       return true;
-     } else {
-       return false;
-     }
-   }
-}  
+
+  // filter for upload list
+  _needsUpdate(r) {
+    if (r["ID"] in this.rDocId2Ent) {
+      // update if parent or name differs
+      let ix = this.rDocId2Ent[r["ID"]];
+      let s = this.rDocList[ix];
+
+      // force update
+      if (this.forceUpdateFunc !== null && this.forceUpdateFunc(r, s)) {
+        // bump up to server version 
+        r["Version"] = s["Version"] + 1;
+        return true;
+      }
+
+      // verbose so can set breakpoints
+      if (s["Parent"] != r["Parent"] || s["VissibleName"] != r["VissibleName"]) {
+        // bump up to server version 
+        r["Version"] = s["Version"] + 1;
+        return true;
+      } else {
+        return false;
+      }
+    }
+    else {
+      // 50MB = 50 * 1024*1024 = 52428800
+      if (r["Type"] == "DocumentType" && r["VissibleName"].endsWith("pdf") && r["_gdSize"] <= 52428800) {
+        return true;
+      } else if (r["Type"] == "CollectionType") {
+        return true;
+      } else {
+        return false;
+      }
+    }
+  }
+
+  rAllDescendantIds() {
+    // returns list of IDs all decendants
+    let collected = [];
+    let that = this;
+    function _walkDocList(parentId) {
+      collected.push(parentId);
+      let children = that.rDocList.filter((r) => r.Parent == parentId).map((r) => _walkDocList(r.ID));
+    }
+    _walkDocList(this.rRootFolderId);
+    // remove the parentId (this typically won't come from Google Drive)
+    return collected.filter(x => x !== this.rRootFolderId);
+  }
 
   run() {
     try {
@@ -231,11 +263,31 @@ class Synchronizer {
 
       // generate list from google drive
       Logger.log(`Scanning Google Drive folder '${this.gdFolder.getName()}'..`)
-      this._walk(this.gdFolder, this.rRootFolderId);
+      this.gdWalk(this.gdFolder, this.rRootFolderId);
+      Logger.log(`Found ${this.uploadDocList.length} items in Google Drive folder.`)
+
+      // for debugging - dump upload doc list as json in root google drive folder
+      //DriveApp.createFile('googleDriveDocList.json', JSON.stringify(this.uploadDocList));
 
       // save new user properties
       this.userProps.setProperties(this.gdIdToUUID);
-      
+
+      // remove files from device no longer in google drive
+      if (this.syncMode === "mirror") {
+        Logger.log("In mirror mode. Will delete files on Remarkable not on Google Drive.");
+        let rDescIds = new Set(this.rAllDescendantIds());
+        let gdIds = new Set(this.uploadDocList.map((r) => r.ID));
+        let diff = rDescIds.difference(gdIds);
+        let deleteList = this.rDocList.filter((r) => diff.has(r.ID));
+        deleteList.forEach((r) => {
+          Logger.log(`Adding for deletion: ${r["VissibleName"]}`);
+        });
+        if (deleteList.length > 0) {
+          Logger.log(`Deleting ${deleteList.length} docs that no longer exist in Google Drive`);
+          this.rApiClient.delete(deleteList);
+        }
+      }
+
       // filter those that need update
       let updateDocList = this.uploadDocList.filter((r) => this._needsUpdate(r));
       Logger.log(`Updating ${updateDocList.length} documents and folders..`)
@@ -272,7 +324,7 @@ class Synchronizer {
         let uploadUpdateStatusResults = this.rApiClient.uploadUpdateStatus(uploadDocChunk);
         for (const r of uploadUpdateStatusResults) {
           if (!r["Success"]) {
-            let ix =  this.rDocId2Ent[r["ID"]];
+            let ix = this.rDocId2Ent[r["ID"]];
             let s = this.rDocList[ix];
             Logger.log(`Failed to update status '${s["VissibleName"]}': ${r["Message"]}`)
           }

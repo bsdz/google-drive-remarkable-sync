@@ -11,7 +11,7 @@ Thanks to splitbrain who did the [initial reverse engineering of Remarkable's cl
 Click in menu "File/Rename" and provide suitable name, eg "Sync Google Drive Books to Remarkable".
 
     1. Option 1 - Include library from Apps Script
-Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBXAwFAOv3U-WUUm_n3_nENg7n6BrDDzze7EekBD9vmf-0" without the double quotes. In version drop down choose "Stable" Then press "Save" button.
+Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBXAwFAOv3U-WUUm_n3_nENg7n6BrDDzze7EekBD9vmf-0" without the double quotes. In version drop down choose "Stable - with syncMode" Then press "Save" button.
 
     2. Option 2 - Copy the code files from this repository into your Apps Script project being careful to rename the *.js files to *.gs files.
 
@@ -22,11 +22,13 @@ Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBX
         function run_sync() {
           // one time code from https://my.remarkable.com/connect/mobile
           let rOneTimeCode = "abcdwxyz";
-          let gdFolderSearchParams = "title = 'Books' and mimeType = 'application/vnd.google-apps.folder'"
-          RemarkableGoogleDriveSyncLib.syncGoogleDriveWithRemarkableCloud(rOneTimeCode, gdFolderSearchParams, "Google Drive");
+          let gdFolderSearchParams = "title = 'Books' and mimeType = 'application/vnd.google-apps.folder'";
+          let syncMode = "mirror";
+          RemarkableGoogleDriveSyncLib.syncGoogleDriveWithRemarkableCloud(rOneTimeCode, gdFolderSearchParams, "Google Drive", syncMode);
         }
 
-    Change the rOneTimeCode to include a one time code obtained from https://my.remarkable.com/connect/mobile. Also change the name "Books" in gdFolderSearchParams to the name of your Google Drive folder that contains your relevant PDFs. You can also replace the gdFolderSearchParams with a Google Drive folder ID.
+    Change the rOneTimeCode to include a one time code obtained from https://my.remarkable.com/connect/mobile. Also change the name "Books" in gdFolderSearchParams to the name of your Google Drive folder that contains your relevant PDFs. You can also replace the gdFolderSearchParams with a Google Drive folder ID. syncMode can be either "update" or "mirror" with
+    mirroring also deleting files from Remarkable device if not found in same location on Google Drive.
 
 4. Click the menu "Run/Run function/run_sync"; you will be prompted for Authorization. Click Review Permissions and select your Google account. You will be prompted that the app isn't verified. Click the Advanced hyperlink and choose "Go to <Your project name> (unsafe)". Choose Allow to the permissions shown.
 
