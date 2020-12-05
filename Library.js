@@ -6,9 +6,10 @@
  * @rRootFolder {string} root folder on Remarkable to sync files to - must already exist. This can be a Remarkable GUID if you know it.
  * @syncMode {string} either "update" or "mirror". Mirroring removes files on device if they no longer exist in Google Drive.
  * @gdSkipFolders {array} list of names of Google Drive folders to skip syncing.
+ * @formats (array) list of file type formats to upload, defaults to just pdf. epub has also been tested
  */
-function syncGoogleDriveWithRemarkableCloud(rOneTimeCode, gdFolderSearchParams, rRootFolder, syncMode="update", gdSkipFolders=[]) {
-  let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, rRootFolder, syncMode, gdSkipFolders);
+function syncGoogleDriveWithRemarkableCloud(rOneTimeCode, gdFolderSearchParams, rRootFolder, syncMode="update", gdSkipFolders=[], formats=["pdf"]) {
+  let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, rRootFolder, syncMode, gdSkipFolders, formats);
   sync.run();
 }
 

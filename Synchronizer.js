@@ -52,10 +52,12 @@ forceUpdateFunc - Optional function of obj dictionaries, the first generated
                   from Google Drive, the second from Remarkable storage. The
                   function returns true/false and determines whether you 
                   wish to bump up the version and force push.
+formats - Optional list of all the file type formats to look for and upload
+          defaults to just pdf, but epub has also been tested and works on device
 
 */
 class Synchronizer {
-  constructor(rOneTimeCode, gdFolderSearchParams, rRootFolderName, syncMode = "update", gdFolderSkipList = [], forceUpdateFunc = null) {
+  constructor(rOneTimeCode, gdFolderSearchParams, rRootFolderName, syncMode = "update", gdFolderSkipList = [], forceUpdateFunc = null, formats = [pdf]) {
 
     // try finding google folder by id first
     try {
@@ -70,6 +72,7 @@ class Synchronizer {
     }
 
     this.gdFolderSkipList = gdFolderSkipList;
+	this.formats = formats;
     this.forceUpdateFunc = forceUpdateFunc;
     // we borrow terminology from https://freefilesync.org/manual.php?topic=synchronization-settings
     if (!availableModes.includes(syncMode)) {
@@ -153,7 +156,7 @@ class Synchronizer {
       let pdBlob = Utilities.newBlob("").setName(`${uuid}.pagedata`);
       let contentData = {
         'extraMetadata': {},
-        'fileType': 'pdf',
+        'fileType': gdFileExt,
         'lastOpenedPage': 0,
         'lineHeight': -1,
         'margins': 100,
@@ -233,10 +236,17 @@ class Synchronizer {
     }
     else {
       // 50MB = 50 * 1024*1024 = 52428800
-      if (r["Type"] == "DocumentType" && r["VissibleName"].endsWith("pdf") && r["_gdSize"] <= 52428800) {
+      if (r["Type"] == "CollectionType") {
         return true;
-      } else if (r["Type"] == "CollectionType") {
-        return true;
+      } else if (r["Type"] == "DocumentType" && r["_gdSize"] <= 52428800) {
+         for (const availableFormat of this.formats)
+		 {
+			if ((r["VissibleName"].endsWith(availableFormat)))
+			{
+				return true;
+			}				
+		 }
+		 return false;
       } else {
         return false;
       }

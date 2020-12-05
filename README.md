@@ -24,7 +24,9 @@ Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBX
           let rOneTimeCode = "abcdwxyz";
           let gdFolderSearchParams = "title = 'Books' and mimeType = 'application/vnd.google-apps.folder'";
           let syncMode = "mirror";
-          RemarkableGoogleDriveSyncLib.syncGoogleDriveWithRemarkableCloud(rOneTimeCode, gdFolderSearchParams, "Google Drive", syncMode);
+		  const skipFolders = [];
+		  const formats = ["pdf, "epub"];
+          RemarkableGoogleDriveSyncLib.syncGoogleDriveWithRemarkableCloud(rOneTimeCode, gdFolderSearchParams, "Google Drive", syncMode, skipFolders, formats);
         }
 
     Change the rOneTimeCode to include a one time code obtained from https://my.remarkable.com/connect/mobile. Also change the name "Books" in gdFolderSearchParams to the name of your Google Drive folder that contains your relevant PDFs. You can also replace the gdFolderSearchParams with a Google Drive folder ID. syncMode can be either "update" or "mirror" with
@@ -42,4 +44,4 @@ That should be it!
 
 * This is a one way sync from Google Drive to Remarkable.
 * Files greater than 50MB in size are not transferred. This appears to be a limit set by reMarkable.
-* Currently, only PDF files are transferred. Adding support for EPUB and other types isn't difficult and might be added later. 
+* Currently, only PDF and EPub files formats have been tested. Other should work as long as reMarkable's Api accepts them
