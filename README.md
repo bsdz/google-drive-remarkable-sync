@@ -1,7 +1,7 @@
 # google-drive-remarkable-sync
 Apps Script library for synchronising Google Drive folder with Remarkable cloud storage.
 
-Files kept in Remarkable's cloud storage are automatically syncronised with your Remarkable device.
+Files kept in Remarkable's cloud storage are automatically synchronised with your Remarkable device.
 
 Thanks to splitbrain who did the [initial reverse engineering of Remarkable's cloud API](https://github.com/splitbrain/ReMarkableAPI/wiki).
 
@@ -11,7 +11,7 @@ Thanks to splitbrain who did the [initial reverse engineering of Remarkable's cl
 Click in menu "File/Rename" and provide suitable name, eg "Sync Google Drive Books to Remarkable".
 
     1. Option 1 - Include library from Apps Script
-Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBXAwFAOv3U-WUUm_n3_nENg7n6BrDDzze7EekBD9vmf-0" without the double quotes. In version drop down choose "Stable - with syncMode" Then press "Save" button.
+Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBXAwFAOv3U-WUUm_n3_nENg7n6BrDDzze7EekBD9vmf-0" without the double quotes. In version drop down choose "Stable - include epub and shortcuts" Then press "Save" button.
 
     2. Option 2 - Copy the code files from this repository into your Apps Script project being careful to rename the *.js files to *.gs files.
 

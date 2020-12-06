@@ -33,7 +33,7 @@ const availableModes = ["mirror", "update"];
 
 /*  Main work here. Walks Google Drive then uploads 
  folder and files to Remarkable cloud storage. Currently
- only uploads PDFs. There appears to be a limitation
+ only uploads PDFs/EPUBs. There appears to be a limitation
  with Remarkable that files must be less than 50MB so
  files greater than this size are filtered out.
 
@@ -101,7 +101,7 @@ class Synchronizer {
 
     // prep some common vars
     this.rDocList = this.rApiClient.listDocs();
-    Logger.log(`Found ${this.rDocList.length} items in Remarkable Cloud`)
+    Logger.log(`Found ${this.rDocList.length} items in Remarkable Cloud`);
 
     // for debugging - dump doc list as json in root google drive folder
     //DriveApp.createFile('remarkableDocList.json', JSON.stringify(this.rDocList));
@@ -125,7 +125,7 @@ class Synchronizer {
         throw `Cannot find root file '${rRootFolderName}'`;
       }
     }
-    Logger.log(`Mapped '${rRootFolderName}' to ID '${this.rRootFolderId}'`)
+    Logger.log(`Mapped '${rRootFolderName}' to ID '${this.rRootFolderId}'`);
   }
 
   getUUID(gdId) {
@@ -142,6 +142,12 @@ class Synchronizer {
     let gdFileObj = DriveApp.getFileById(gdFileId);
     let gdFileMT = gdFileObj.getMimeType();
 
+    if (gdFileMT == MimeType.SHORTCUT) {
+      Logger.log(`Resolving shortcut to target file '${gdFileObj.getName()}'`);
+      gdFileObj = DriveApp.getFileById(gdFileObj.getTargetId());
+      gdFileMT = gdFileObj.getMimeType();
+    }
+    
     let zipBlob = null;
 
     if (gdFileMT == MimeType.FOLDER) {
@@ -153,7 +159,7 @@ class Synchronizer {
       let pdBlob = Utilities.newBlob("").setName(`${uuid}.pagedata`);
       let contentData = {
         'extraMetadata': {},
-        'fileType': 'pdf',
+        'fileType': gdFileExt,
         'lastOpenedPage': 0,
         'lineHeight': -1,
         'margins': 100,
@@ -171,7 +177,7 @@ class Synchronizer {
 
   gdWalk(top, rParentId) {
     if (this.gdFolderSkipList.includes(top.getName())) {
-      Logger.log(`Skipping Google Drive sub folder '${top.getName()}'`)
+      Logger.log(`Skipping Google Drive sub folder '${top.getName()}'`);
       return;
     }
     Logger.log(`Scanning Google Drive sub folder '${top.getName()}'`)
@@ -233,7 +239,9 @@ class Synchronizer {
     }
     else {
       // 50MB = 50 * 1024*1024 = 52428800
-      if (r["Type"] == "DocumentType" && r["VissibleName"].endsWith("pdf") && r["_gdSize"] <= 52428800) {
+      if (r["Type"] == "DocumentType" 
+          && (r["VissibleName"].endsWith("pdf") || r["VissibleName"].endsWith("epub")) 
+          && r["_gdSize"] <= 52428800) {
         return true;
       } else if (r["Type"] == "CollectionType") {
         return true;
