@@ -37,3 +37,9 @@ Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBX
 6. Set up a regular trigger by click in menu "Edit/Current project's triggers". Click "+ Add Trigger" button. Choose run_sync function and select "Time-driver", "Hour timer", "Every hour" and "Notify me daily" then press Save.
 
 That should be it!
+
+# Limitations
+
+* This is a one way sync from Google Drive to Remarkable.
+* Files greater than 50MB in size are not transferred. This appears to be a limit set by reMarkable.
+* Currently, only PDF files are transferred. Adding support for EPUB and other types isn't difficult and might be added later. 
