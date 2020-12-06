@@ -41,5 +41,4 @@ That should be it!
 # Limitations
 
 * This is a one way sync from Google Drive to Remarkable.
-* Files greater than 50MB in size are not transferred. This appears to be a limit set by reMarkable.
-* Currently, only PDF files are transferred. Adding support for EPUB and other types isn't difficult and might be added later. 
+* Files greater than 50MB in size are not transferred. This appears to be a limit set by reMarkable. 
