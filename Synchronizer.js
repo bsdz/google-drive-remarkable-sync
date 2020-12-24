@@ -30,8 +30,9 @@ const isUUID = (uuid) => {
 const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
 const rDeviceIdKey = "__REMARKABLE_DEVICE_ID__";
 const availableModes = ["mirror", "update"];
+let lastRunTime = "0001-01-01T00:00:00.000Z"
 
-/*  Main work here. Walks Google Drive then uploads 
+/*  Main work here. Walks Google Drive then uploads
  folder and files to Remarkable cloud storage. Currently
  only uploads PDFs/EPUBs. There appears to be a limitation
  with Remarkable that files must be less than 50MB so
@@ -50,7 +51,7 @@ syncMode - "mirror" or "update" (default). Mirroring will delete files
 gdFolderSkipList - Optional list of folder names to skip from syncing
 forceUpdateFunc - Optional function of obj dictionaries, the first generated
                   from Google Drive, the second from Remarkable storage. The
-                  function returns true/false and determines whether you 
+                  function returns true/false and determines whether you
                   wish to bump up the version and force push.
 
 */
@@ -104,7 +105,7 @@ class Synchronizer {
     Logger.log(`Found ${this.rDocList.length} items in Remarkable Cloud`);
 
     // for debugging - dump doc list as json in root google drive folder
-    //DriveApp.createFile('remarkableDocList.json', JSON.stringify(this.rDocList));
+//DriveApp.createFile('remarkableDocList.json', JSON.stringify(this.rDocList));
 
     // create reverse dictionary
     this.rDocId2Ent = {}
@@ -147,15 +148,30 @@ class Synchronizer {
       gdFileObj = DriveApp.getFileById(gdFileObj.getTargetId());
       gdFileMT = gdFileObj.getMimeType();
     }
-    
+
     let zipBlob = null;
 
     if (gdFileMT == MimeType.FOLDER) {
       let contentBlob = Utilities.newBlob(JSON.stringify({})).setName(`${uuid}.content`);
       zipBlob = Utilities.zip([contentBlob]);
     } else {
-      let gdFileExt = gdFileObj.getName().split('.').pop();
-      let gdFileBlob = gdFileObj.getBlob().setName(`${uuid}.${gdFileExt}`);
+
+      let gdFileExt, gdFileBlob
+      // force PDF extension on Google stuff
+      // Logger.log(`MimeType '${gdFileObj.getMimeType()}'`);
+      let googleMimeTypes = {
+        'application/vnd.google-apps.document': true,
+        'application/vnd.google-apps.spreadsheet': true,
+      }
+
+      if (!!googleMimeTypes[gdFileObj.getMimeType()]) {
+        gdFileExt = 'pdf';
+        gdFileBlob = gdFileObj.getBlob().getAs('application/pdf').setName(`${uuid}.${gdFileExt}`);
+      } else {
+        gdFileExt = gdFileObj.getName().split('.').pop();
+        gdFileBlob = gdFileObj.getBlob().setName(`${uuid}.${gdFileExt}`);
+      }
+
       let pdBlob = Utilities.newBlob("").setName(`${uuid}.pagedata`);
       let contentData = {
         'extraMetadata': {},
@@ -188,21 +204,27 @@ class Synchronizer {
       "Parent": rParentId,
       "VissibleName": top.getName(),
       "Version": 1,
+      "ModifiedClient": Utilities.formatDate(top.getLastUpdated(), "GMT", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
       "_gdId": top.getId(),
       "_gdSize": top.getSize(),
+      "_gdMimeType": "Folder",
     });
 
     let files = top.getFiles();
     while (files.hasNext()) {
       let file = files.next();
+      // returns 0 if Google Workspace file https://developers.google.com/apps-script/reference/drive/file#getsize
+      let fileSize = !file.getSize() ? 100 : file.getSize()
       this.uploadDocList.push({
         "ID": this.getUUID(file.getId()),
         "Type": "DocumentType",
         "Parent": topUUID,
         "VissibleName": file.getName(),
         "Version": 1,
+        "ModifiedClient": Utilities.formatDate(file.getLastUpdated(), "GMT", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
         "_gdId": file.getId(),
-        "_gdSize": file.getSize(),
+        "_gdSize": fileSize,
+        "_gdMimeType": file.getMimeType(),
       });
     }
 
@@ -223,14 +245,14 @@ class Synchronizer {
 
       // force update
       if (this.forceUpdateFunc !== null && this.forceUpdateFunc(r, s)) {
-        // bump up to server version 
+        // bump up to server version
         r["Version"] = s["Version"] + 1;
         return true;
       }
 
       // verbose so can set breakpoints
-      if (s["Parent"] != r["Parent"] || s["VissibleName"] != r["VissibleName"]) {
-        // bump up to server version 
+      if (s["Parent"] != r["Parent"] || s["VissibleName"] != r["VissibleName"] || this.lastRunTime < r["ModifiedClient"]) {
+        // bump up to server version
         r["Version"] = s["Version"] + 1;
         return true;
       } else {
@@ -238,9 +260,17 @@ class Synchronizer {
       }
     }
     else {
+
+      let allowedMimeTypes = {
+        'application/vnd.google-apps.document': true,
+        'application/vnd.google-apps.spreadsheet': true,
+        'application/pdf': true,
+        'application/x-pdf': false, // old PDF files - https://stackoverflow.com/a/312258/2161848
+        'application/epub+zip': true,
+      }
       // 50MB = 50 * 1024*1024 = 52428800
-      if (r["Type"] == "DocumentType" 
-          && (r["VissibleName"].endsWith("pdf") || r["VissibleName"].endsWith("epub")) 
+      if (r["Type"] == "DocumentType"
+          && !!allowedMimeTypes[r["_gdMimeType"]]
           && r["_gdSize"] <= 52428800) {
         return true;
       } else if (r["Type"] == "CollectionType") {
@@ -268,6 +298,9 @@ class Synchronizer {
     try {
       // store all objects in this
       this.uploadDocList = [];
+      this.lastRunTime = dictPop(this.gdIdToUUID, lastRunTime, null);
+      // Logger.log('Previous script run time', this.lastRunTime);
+      this.userProps.setProperty(lastRunTime, Utilities.formatDate(new Date(), "GMT", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"));
 
       // generate list from google drive
       Logger.log(`Scanning Google Drive folder '${this.gdFolder.getName()}'..`)
