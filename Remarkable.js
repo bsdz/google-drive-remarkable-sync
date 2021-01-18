@@ -178,6 +178,23 @@ class RemarkableAPI {
     let res = JSON.parse(text);
     return res;
   }
+  
+  downloadBlob(doc) {
+    let blob = this._downloadBlob(doc["BlobURLGet"]);
+    let name = doc["VissibleName"].replace('.pdf', '.bin');
+    blob.setName(name);
+    return blob;
+  }
+  
+  _downloadBlob(url) {
+    let response = UrlFetchApp.fetch(url, {
+      'method': 'GET',
+      'headers': {
+        'Authorization': `Bearer ${this.userToken}`
+      },
+    });
+    return response.getBlob();
+  }
 
   delete(data) {
     let payloadData = data.map((r) => (
