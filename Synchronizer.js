@@ -317,7 +317,7 @@ class Synchronizer {
           // upload files if not already on device.
           // if forced, upload regardless of whether they're on device.
           let alreadyOnDevice = rDescIds.has(doc["ID"]);
-          if (doc["Success"] && (this._forcedUpdate(uploadDocChunk) || !alreadyOnDevice)) {
+          if (doc["Success"] && (this._forcedUpdate(doc) || !alreadyOnDevice)) {
             try {
               let gdFileId = this.UUIDToGdId[doc["ID"]];
               let gdFileObj = DriveApp.getFileById(gdFileId);
