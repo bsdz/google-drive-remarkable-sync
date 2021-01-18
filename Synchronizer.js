@@ -211,18 +211,21 @@ class Synchronizer {
       let folder = folders.next();
       this.gdWalk(folder, topUUID);
     }
-
   }
 
+  _forcedUpdate(r) {
+    if (!(r["ID"] in this.rDocId2Ent)) {
+      return false;
+    }
+    let ix = this.rDocId2Ent[r["ID"]];
+    let s = this.rDocList[ix];
+    return this.forceUpdateFunc !== null && this.forceUpdateFunc(r, s);
+  }
+  
   // filter for upload list
   _needsUpdate(r) {
     if (r["ID"] in this.rDocId2Ent) {
-      // update if parent or name differs
-      let ix = this.rDocId2Ent[r["ID"]];
-      let s = this.rDocList[ix];
-
-      // force update
-      if (this.forceUpdateFunc !== null && this.forceUpdateFunc(r, s)) {
+      if (this._forcedUpdate(r)) {
         // bump up to server version 
         r["Version"] = s["Version"] + 1;
         return true;
@@ -232,6 +235,7 @@ class Synchronizer {
       if (s["Parent"] != r["Parent"] || s["VissibleName"] != r["VissibleName"]) {
         // bump up to server version 
         r["Version"] = s["Version"] + 1;
+        r["CurrentPage"] = s["CurrentPage"];
         return true;
       } else {
         return false;
@@ -279,11 +283,12 @@ class Synchronizer {
 
       // save new user properties
       this.userProps.setProperties(this.gdIdToUUID);
+      
+      let rDescIds = new Set(this.rAllDescendantIds());
 
       // remove files from device no longer in google drive
       if (this.syncMode === "mirror") {
         Logger.log("In mirror mode. Will delete files on Remarkable not on Google Drive.");
-        let rDescIds = new Set(this.rAllDescendantIds());
         let gdIds = new Set(this.uploadDocList.map((r) => r.ID));
         let diff = rDescIds.difference(gdIds);
         let deleteList = this.rDocList.filter((r) => diff.has(r.ID));
@@ -307,10 +312,12 @@ class Synchronizer {
         // extract data for registration
         let uploadRequestResults = this.rApiClient.uploadRequest(uploadDocChunk);
 
-        // upload files
         let deleteDocList = [];
         for (const doc of uploadRequestResults) {
-          if (doc["Success"]) {
+          // upload files if not already on device.
+          // if forced, upload regardless of whether they're on device.
+          let alreadyOnDevice = rDescIds.has(doc["ID"]);
+          if (doc["Success"] && (this._forcedUpdate(uploadDocChunk) || !alreadyOnDevice)) {
             try {
               let gdFileId = this.UUIDToGdId[doc["ID"]];
               let gdFileObj = DriveApp.getFileById(gdFileId);
