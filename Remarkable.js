@@ -1,3 +1,9 @@
+function stripExtension(fname) {
+  let last = fname.lastIndexOf('.');
+  if (last === -1) return fname;
+  return fname.substr(0, last);
+}
+
 class RemarkableAPI {
 
   constructor(deviceId = null, deviceToken = null, oneTimeCode = null) {
@@ -181,8 +187,8 @@ class RemarkableAPI {
   
   downloadBlob(doc) {
     let blob = this._downloadBlob(doc["BlobURLGet"]);
-    let name = doc["VissibleName"].replace('.pdf', '.bin');
-    blob.setName(name);
+    let name = stripExtension(doc["VissibleName"]);
+    blob.setName(`${name}.bin`);
     return blob;
   }
   
