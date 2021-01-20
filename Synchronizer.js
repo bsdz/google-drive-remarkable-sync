@@ -44,7 +44,7 @@ rOneTimeCode - One time pass code from Remarkable that can typically
 gdFolderSearchParams - Google Drive search SDK string or folder id.
 rRootFolderName - The root folder in Remarkable device. Currently this
                   must already exist on your device. This can be a remarkable
-                  folder GUID if you know it.
+                  folder GUID if you know it. Use False for Remarkable root.
 syncMode - "mirror" or "update" (default). Mirroring will delete files
            in Remarkebale cloud that have been removed from Google Drive.
 gdFolderSkipList - Optional list of folder names to skip from syncing
@@ -115,7 +115,7 @@ class Synchronizer {
     // find root folder id
     if (isUUID(rRootFolderName)) {
       this.rRootFolderId = rRootFolderName;
-    } else {
+    } else if (rRootFolderName) {
       let filteredDocs = this.rDocList.filter((r) => r["VissibleName"] == rRootFolderName);
       if (filteredDocs.length > 0) {
         this.rRootFolderId = filteredDocs[0]["ID"];
@@ -182,16 +182,19 @@ class Synchronizer {
     }
     Logger.log(`Scanning Google Drive sub folder '${top.getName()}'`)
     let topUUID = this.getUUID(top.getId());
-    this.uploadDocList.push({
-      "ID": topUUID,
-      "Type": "CollectionType",
-      "Parent": rParentId,
-      "VissibleName": top.getName(),
-      "Version": 1,
-      "_gdId": top.getId(),
-      "_gdSize": top.getSize(),
-    });
-
+    if (rParentId && top.getName() !== this.gdFolder.getName()) {
+      this.uploadDocList.push({
+        "ID": topUUID,
+        "Type": "CollectionType",
+        "Parent": rParentId,
+        "VissibleName": top.getName(),
+        "Version": 1,
+        "_gdId": top.getId(),
+        "_gdSize": top.getSize(),
+      });
+    } else {
+      topUUID = rParentId ? rParentId : topUUID;
+    }
     let files = top.getFiles();
     while (files.hasNext()) {
       let file = files.next();
