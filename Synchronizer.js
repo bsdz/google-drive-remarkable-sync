@@ -27,9 +27,50 @@ const isUUID = (uuid) => {
   return re.test(uuid)
 }
 
+const rCacheFname = 'RmCache.json';
+
 const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
 const rDeviceIdKey = "__REMARKABLE_DEVICE_ID__";
 const availableModes = ["mirror", "update"];
+
+class Cache {
+  constructor(srcFname, folder) {
+    let info = this._load(srcFname, folder);
+    this.folder = folder;
+    this.file = info.file || this.save([]);
+    this.cache = info.cache;
+  }
+  
+  _load(srcFname, folder) {
+    let cacheFile = folder.getFilesByName(srcFname);
+    let cache = {};
+    if (cacheFile.hasNext()) {
+      cacheFile = cacheFile.next();
+      let cList = JSON.parse(cacheFile.getBlob().getDataAsString());
+      for (var doc of cList) {
+        cache[doc.ID] = doc;
+      }
+    } else {
+      cacheFile = undefined;
+    }
+    return {file: cacheFile, cache: cache};
+  }
+  
+  save(rDocList) {
+    let cacheBlob = Utilities.newBlob(JSON.stringify(rDocList));
+    if (this.file) {
+      this.file = Drive.Files.update({
+        title: this.file.getName(),
+        mimeType: this.file.getMimeType()
+      }, this.file.getId(), cacheBlob);
+    } else {
+      this.file = DriveApp
+        .createFile(rCacheFname, cacheBlob)
+        .moveTo(this.folder);
+    }
+    return this.file;
+  }
+}
 
 /*  Main work here. Walks Google Drive then uploads 
  folder and files to Remarkable cloud storage. Currently
@@ -262,6 +303,54 @@ class Synchronizer {
     _walkDocList(this.rRootFolderId);
     // remove the parentId (this typically won't come from Google Drive)
     return collected.filter(x => x !== this.rRootFolderId);
+  }
+
+  // NOTE(tk) quick prototype for 2-way sync. Unused for now.
+  // Cache examples to a JSON file; download zips for all updated `.bin`s.
+  downloadUpdates(rDocList) {
+    let cacheInfo = new Cache(rCacheFname, this.gdFolder);
+    for (let rDoc of rDocList) {
+      // TODO(tk) not sure what !Success means in RM response.
+      if (!rDoc.Success || rDoc.Type != 'DocumentType')
+        continue;
+      let cachedDoc = cacheInfo.cache[rDoc.ID];
+      // TODO(tk) default behavior is to download if no cached doc present.
+      // TODO(tk) also would be useful to notice file move on RM?
+      // Something like: this.UUIDToGdId[cachedDoc.Parent] -> old
+      if (!cachedDoc || rDoc.Version > cachedDoc.Version) {
+        Logger.info(
+          `Downloading blob update for file 
+          ${rDoc.VissibleName} (v${rDoc.Version})...`);
+
+        let gdParentId = this.UUIDToGdId[rDoc.Parent];
+        let parentFolder = gdParentId
+          ? DriveApp.getFolderById(gdParentId)
+          : this.gdFolder;
+        let blob = this.rApiClient.downloadBlob(rDoc);
+        
+        let identicalNameFiles = parentFolder.searchFiles(
+          `title = '${blob.getName()}'`);
+        let currentFile;
+        if (identicalNameFiles.hasNext()) {
+          currentFile = identicalNameFiles.next();
+          Drive.Files.update({
+            title: currentFile.getName(),
+            mimeType: currentFile.getMimeType()
+          }, currentFile.getId(), blob);
+        } else {
+          currentFile = DriveApp.createFile(blob);
+          currentFile.moveTo(parentFolder);
+        }
+
+        Drive.Properties.insert({
+          key: 'Version',
+          value: rDoc.Version,
+          visibility: 'PRIVATE'
+        }, currentFile.getId());
+      }
+    }
+    
+    cacheInfo.save(rDocList);
   }
 
   run() {
