@@ -27,6 +27,24 @@ const isUUID = (uuid) => {
   return re.test(uuid)
 }
 
+// Update blob (Blob) or create in parentFolder (GDFolder)
+function _updateOrCreate(parentFolder, blob) {
+  let identicalNameFiles = parentFolder.searchFiles(
+    `title = '${blob.getName()}'`);
+  let currentFile;
+  if (identicalNameFiles.hasNext()) {
+    currentFile = identicalNameFiles.next();
+    Drive.Files.update({
+      title: currentFile.getName(),
+      mimeType: currentFile.getMimeType()
+    }, currentFile.getId(), blob);
+  } else {
+    currentFile = DriveApp.createFile(blob);
+    currentFile.moveTo(parentFolder);
+  }
+  return currentFile;
+}
+
 const rCacheFname = 'RmCache.json';
 
 const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
@@ -327,21 +345,8 @@ class Synchronizer {
           ? DriveApp.getFolderById(gdParentId)
           : this.gdFolder;
         let blob = this.rApiClient.downloadBlob(rDoc);
+        let currentFile = _updateOrCreateBlob(parentFolder, blob);
         
-        let identicalNameFiles = parentFolder.searchFiles(
-          `title = '${blob.getName()}'`);
-        let currentFile;
-        if (identicalNameFiles.hasNext()) {
-          currentFile = identicalNameFiles.next();
-          Drive.Files.update({
-            title: currentFile.getName(),
-            mimeType: currentFile.getMimeType()
-          }, currentFile.getId(), blob);
-        } else {
-          currentFile = DriveApp.createFile(blob);
-          currentFile.moveTo(parentFolder);
-        }
-
         Drive.Properties.insert({
           key: 'Version',
           value: rDoc.Version,
@@ -368,6 +373,14 @@ class Synchronizer {
 
       // save new user properties
       this.userProps.setProperties(this.gdIdToUUID);
+      
+      // TODO(tk) 2way sync option?
+      try {
+        Logger.log('Downloading updates from uploadDocList.');
+        this.downloadUpdates(this.uploadDocList);
+      } catch (err) {
+        Logger.log(`Download failed with err ${err}.`);
+      }
 
       // remove files from device no longer in google drive
       if (this.syncMode === "mirror") {
