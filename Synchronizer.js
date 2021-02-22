@@ -70,7 +70,7 @@ class Synchronizer {
     }
 
     this.gdFolderSkipList = gdFolderSkipList;
-    this.forceUpdateFunc = forceUpdateFunc;
+    this.forceUpdateFunc = forceUpdateFunc || ((r, s) => false);
     // we borrow terminology from https://freefilesync.org/manual.php?topic=synchronization-settings
     if (!availableModes.includes(syncMode)) {
       throw `syncMode '${syncMode}' not supported, try one from: ${availableModes}`
@@ -212,20 +212,17 @@ class Synchronizer {
       this.gdWalk(folder, topUUID);
     }
   }
-
-  _forcedUpdate(r) {
-    if (!(r["ID"] in this.rDocId2Ent)) {
-      return false;
-    }
-    let ix = this.rDocId2Ent[r["ID"]];
-    let s = this.rDocList[ix];
-    return this.forceUpdateFunc !== null && this.forceUpdateFunc(r, s);
+  
+  _serverVersion(r) {
+    let ix = this.rDocId2Ent[r.ID];
+    return ix === undefined ? undefined : this.rDocList[ix];
   }
   
   // filter for upload list
   _needsUpdate(r) {
     if (r["ID"] in this.rDocId2Ent) {
-      if (this._forcedUpdate(r)) {
+      let s = this._serverVersion(r);
+      if (this.forceUpdateFunc(r, s)) {
         // bump up to server version 
         r["Version"] = s["Version"] + 1;
         return true;
@@ -317,7 +314,8 @@ class Synchronizer {
           // upload files if not already on device.
           // if forced, upload regardless of whether they're on device.
           let alreadyOnDevice = rDescIds.has(doc["ID"]);
-          if (doc["Success"] && (this._forcedUpdate(doc) || !alreadyOnDevice)) {
+          let s = this._serverVersion(doc);
+          if (doc["Success"] && (this.forceUpdateFunc(doc, s) || !alreadyOnDevice)) {
             try {
               let gdFileId = this.UUIDToGdId[doc["ID"]];
               let gdFileObj = DriveApp.getFileById(gdFileId);
@@ -339,8 +337,7 @@ class Synchronizer {
         let uploadUpdateStatusResults = this.rApiClient.uploadUpdateStatus(uploadDocChunk);
         for (const r of uploadUpdateStatusResults) {
           if (!r["Success"]) {
-            let ix = this.rDocId2Ent[r["ID"]];
-            let s = this.rDocList[ix];
+            let s = this._serverVersion(r);
             Logger.log(`Failed to update status '${s["VissibleName"]}': ${r["Message"]}`)
           }
         }
