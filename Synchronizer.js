@@ -283,6 +283,9 @@ class Synchronizer {
   // filter for upload list
   _needsUpdate(r) {
     if (r["ID"] in this.rDocId2Ent) {
+      let ix = this.rDocId2Ent[r["ID"]];
+      let s = this.rDocList[ix];
+      
       if (this._forcedUpdate(r)) {
         // bump up to server version 
         r["Version"] = s["Version"] + 1;
@@ -326,10 +329,8 @@ class Synchronizer {
     return collected.filter(x => x !== this.rRootFolderId);
   }
 
-  // NOTE(tk) quick prototype for 2-way sync. Unused for now.
   // Cache examples to a JSON file; download zips for all updated `.bin`s.
-  downloadUpdates(cacheInfo, rDocList) {
-    
+  downloadUpdates(cacheInfo, rDocList) {  
     for (let rDoc of rDocList) {
       // TODO(tk) not sure what !Success means in RM response.
       if (!rDoc.Success || rDoc.Type != 'DocumentType')
@@ -375,23 +376,14 @@ class Synchronizer {
       // save new user properties
       this.userProps.setProperties(this.gdIdToUUID);
       
-      // TODO(tk) 2way sync option?
-      try {
-        Logger.log('Downloading updates from uploadDocList.');
-        let cacheInfo = new Cache(rCacheFname, this.gdFolder);
-        this.downloadUpdates(cacheInfo, this.rDocList);
-        cacheInfo.save(rDocList);
-      } catch (err) {
-        Logger.log(`Download failed with err ${err}.`);
-      }
-      
       let rDescIds = new Set(this.rAllDescendantIds());
-
-      // remove files from device no longer in google drive
+      let diff = new Set();
+      
+      Logger.log(`In ${this.syncMode} mode.`); 
       if (this.syncMode === "mirror") {
-        Logger.log("In mirror mode. Will delete files on Remarkable not on Google Drive.");
+        Logger.log("Deleting files on Remarkable not on Google Drive.");
         let gdIds = new Set(this.uploadDocList.map((r) => r.ID));
-        let diff = rDescIds.difference(gdIds);
+        diff = rDescIds.difference(gdIds);
         let deleteList = this.rDocList.filter((r) => diff.has(r.ID));
         deleteList.forEach((r) => {
           Logger.log(`Adding for deletion: ${r["VissibleName"]}`);
@@ -400,6 +392,16 @@ class Synchronizer {
           Logger.log(`Deleting ${deleteList.length} docs that no longer exist in Google Drive`);
           this.rApiClient.delete(deleteList);
         }
+      }
+      
+      try {
+        Logger.log('Downloading updates from ReMarkable.');
+        let cacheInfo = new Cache(rCacheFname, this.gdFolder);
+        let nonDeleteList = this.rDocList.filter(r => !diff.has(r.ID));
+        this.downloadUpdates(cacheInfo, nonDeleteList);
+        cacheInfo.save(rDocList);
+      } catch (err) {
+        Logger.log(`Download failed with err ${err}.`);
       }
 
       // filter those that need update
