@@ -159,7 +159,7 @@ class Synchronizer {
     }
 
     // prep some common vars
-    this.rDocList = this.rApiClient.listDocs();
+    this.rDocList = this.rApiClient.listDocs(/*docUuid4=*/ null, /*withBlob=*/ true);
     Logger.log(`Found ${this.rDocList.length} items in Remarkable Cloud`);
 
     // for debugging - dump doc list as json in root google drive folder
