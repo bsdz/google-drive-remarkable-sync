@@ -1,3 +1,9 @@
+function stripExtension(fname) {
+  let last = fname.lastIndexOf('.');
+  if (last === -1) return fname;
+  return fname.substr(0, last);
+}
+
 class RemarkableAPI {
 
   constructor(deviceId = null, deviceToken = null, oneTimeCode = null) {
@@ -177,6 +183,23 @@ class RemarkableAPI {
     let text = response.getContentText()
     let res = JSON.parse(text);
     return res;
+  }
+  
+  downloadBlob(doc) {
+    let blob = this._downloadBlob(doc["BlobURLGet"]);
+    let name = stripExtension(doc["VissibleName"]);
+    blob.setName(`${name}.bin`);
+    return blob;
+  }
+  
+  _downloadBlob(url) {
+    let response = UrlFetchApp.fetch(url, {
+      'method': 'GET',
+      'headers': {
+        'Authorization': `Bearer ${this.userToken}`
+      },
+    });
+    return response.getBlob();
   }
 
   delete(data) {
