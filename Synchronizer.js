@@ -27,6 +27,7 @@ const isUUID = (uuid) => {
   return re.test(uuid)
 }
 
+
 // Update blob (Blob) or create in parentFolder (GDFolder)
 function _updateOrCreate(parentFolder, blob) {
   let identicalNameFiles = parentFolder.searchFiles(
@@ -53,39 +54,36 @@ const availableModes = ["mirror", "update"];
 
 class Cache {
   constructor(srcFname, folder) {
-    let info = this._load(srcFname, folder);
     this.folder = folder;
-    this.file = info.file || this.save([]);
+    let info = this._load(srcFname, folder);
+    this.file = info.file;
     this.cache = info.cache;
   }
   
   _load(srcFname, folder) {
-    let cacheFile = folder.getFilesByName(srcFname);
-    let cache = {};
-    if (cacheFile.hasNext()) {
-      cacheFile = cacheFile.next();
-      let cList = JSON.parse(cacheFile.getBlob().getDataAsString());
-      for (var doc of cList) {
-        cache[doc.ID] = doc;
-      }
+    let cacheFileIter = folder.getFilesByName(srcFname);
+    let cacheFile = undefined;
+    if (cacheFileIter.hasNext()) {
+      cacheFile = cacheFileIter.next();
     } else {
-      cacheFile = undefined;
+      cacheFile = DriveApp
+        .createFile(srcFname, JSON.stringify([]))
+        .moveTo(folder);
+    }
+    let cache = {};
+    let cList = JSON.parse(cacheFile.getBlob().getDataAsString());
+    for (var doc of cList) {
+      cache[doc.ID] = doc;
     }
     return {file: cacheFile, cache: cache};
   }
   
   save(rDocList) {
     let cacheBlob = Utilities.newBlob(JSON.stringify(rDocList));
-    if (this.file) {
-      this.file = Drive.Files.update({
-        title: this.file.getName(),
-        mimeType: this.file.getMimeType()
-      }, this.file.getId(), cacheBlob);
-    } else {
-      this.file = DriveApp
-        .createFile(rCacheFname, cacheBlob)
-        .moveTo(this.folder);
-    }
+    this.file = Drive.Files.update({
+      title: this.file.getName(),
+      mimeType: this.file.getMimeType()
+    }, this.file.getId(), cacheBlob);
     return this.file;
   }
 }
