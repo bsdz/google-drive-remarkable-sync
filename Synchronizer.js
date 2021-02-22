@@ -1,6 +1,12 @@
+
+const rCacheFname = 'RmCache.json';
+
+const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
+const rDeviceIdKey = "__REMARKABLE_DEVICE_ID__";
+const availableModes = ["mirror", "update"];
+
 // https://stackoverflow.com/questions/23013573/swap-key-with-value-json/54207992#54207992
 const reverseDict = (o, r = {}) => Object.keys(o).map(x => r[o[x]] = x) && r;
-
 
 // https://github.com/30-seconds/30-seconds-of-code/blob/master/snippets/chunk.md
 const chunk = (arr, size) =>
@@ -27,7 +33,6 @@ const isUUID = (uuid) => {
   return re.test(uuid)
 }
 
-
 // Update blob (Blob) or create in parentFolder (GDFolder)
 function _updateOrCreate(parentFolder, blob) {
   let identicalNameFiles = parentFolder.searchFiles(
@@ -46,36 +51,31 @@ function _updateOrCreate(parentFolder, blob) {
   return currentFile;
 }
 
-const rCacheFname = 'RmCache.json';
+function _ensureFile(fname, folder) {
+  let iter = folder.getFilesByName(fname);
+  if (iter.hasNext()) {
+    return iter.next();
+  } else {
+    return DriveApp
+      .createFile(srcFname, JSON.stringify([]))
+      .moveTo(folder);
+  }
+}
 
-const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
-const rDeviceIdKey = "__REMARKABLE_DEVICE_ID__";
-const availableModes = ["mirror", "update"];
+function _listToIdDict(gdFile) {
+  let cache = {};
+  let cList = JSON.parse(gdFile.getBlob().getDataAsString());
+  for (var doc of cList) {
+    cache[doc.ID] = doc;
+  }
+  return cache;
+}
 
 class Cache {
   constructor(srcFname, folder) {
     this.folder = folder;
-    let info = this._load(srcFname, folder);
-    this.file = info.file;
-    this.cache = info.cache;
-  }
-  
-  _load(srcFname, folder) {
-    let cacheFileIter = folder.getFilesByName(srcFname);
-    let cacheFile = undefined;
-    if (cacheFileIter.hasNext()) {
-      cacheFile = cacheFileIter.next();
-    } else {
-      cacheFile = DriveApp
-        .createFile(srcFname, JSON.stringify([]))
-        .moveTo(folder);
-    }
-    let cache = {};
-    let cList = JSON.parse(cacheFile.getBlob().getDataAsString());
-    for (var doc of cList) {
-      cache[doc.ID] = doc;
-    }
-    return {file: cacheFile, cache: cache};
+    this.file = _ensureFile(srcFname, folder);
+    this.cache = _listToIdDict(this.file);
   }
   
   save(rDocList) {
@@ -84,6 +84,7 @@ class Cache {
       title: this.file.getName(),
       mimeType: this.file.getMimeType()
     }, this.file.getId(), cacheBlob);
+    this.cache = _listToIdDict(this.file);
     return this.file;
   }
 }
