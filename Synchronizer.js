@@ -70,7 +70,7 @@ class Synchronizer {
     }
 
     this.gdFolderSkipList = gdFolderSkipList;
-    this.forceUpdateFunc = forceUpdateFunc;
+    this.forceUpdateFunc = forceUpdateFunc || ((r, s) => false);
     // we borrow terminology from https://freefilesync.org/manual.php?topic=synchronization-settings
     if (!availableModes.includes(syncMode)) {
       throw `syncMode '${syncMode}' not supported, try one from: ${availableModes}`
@@ -211,18 +211,18 @@ class Synchronizer {
       let folder = folders.next();
       this.gdWalk(folder, topUUID);
     }
-
   }
-
+  
+  _serverVersion(r) {
+    let ix = this.rDocId2Ent[r.ID];
+    return ix === undefined ? undefined : this.rDocList[ix];
+  }
+  
   // filter for upload list
   _needsUpdate(r) {
     if (r["ID"] in this.rDocId2Ent) {
-      // update if parent or name differs
-      let ix = this.rDocId2Ent[r["ID"]];
-      let s = this.rDocList[ix];
-
-      // force update
-      if (this.forceUpdateFunc !== null && this.forceUpdateFunc(r, s)) {
+      let s = this._serverVersion(r);
+      if (this.forceUpdateFunc(r, s)) {
         // bump up to server version 
         r["Version"] = s["Version"] + 1;
         return true;
@@ -232,6 +232,7 @@ class Synchronizer {
       if (s["Parent"] != r["Parent"] || s["VissibleName"] != r["VissibleName"]) {
         // bump up to server version 
         r["Version"] = s["Version"] + 1;
+        r["CurrentPage"] = s["CurrentPage"];
         return true;
       } else {
         return false;
@@ -279,11 +280,12 @@ class Synchronizer {
 
       // save new user properties
       this.userProps.setProperties(this.gdIdToUUID);
+      
+      let rDescIds = new Set(this.rAllDescendantIds());
 
       // remove files from device no longer in google drive
       if (this.syncMode === "mirror") {
         Logger.log("In mirror mode. Will delete files on Remarkable not on Google Drive.");
-        let rDescIds = new Set(this.rAllDescendantIds());
         let gdIds = new Set(this.uploadDocList.map((r) => r.ID));
         let diff = rDescIds.difference(gdIds);
         let deleteList = this.rDocList.filter((r) => diff.has(r.ID));
@@ -307,10 +309,13 @@ class Synchronizer {
         // extract data for registration
         let uploadRequestResults = this.rApiClient.uploadRequest(uploadDocChunk);
 
-        // upload files
         let deleteDocList = [];
         for (const doc of uploadRequestResults) {
-          if (doc["Success"]) {
+          // upload files if not already on device.
+          // if forced, upload regardless of whether they're on device.
+          let alreadyOnDevice = rDescIds.has(doc["ID"]);
+          let s = this._serverVersion(doc);
+          if (doc["Success"] && (this.forceUpdateFunc(doc, s) || !alreadyOnDevice)) {
             try {
               let gdFileId = this.UUIDToGdId[doc["ID"]];
               let gdFileObj = DriveApp.getFileById(gdFileId);
@@ -332,8 +337,7 @@ class Synchronizer {
         let uploadUpdateStatusResults = this.rApiClient.uploadUpdateStatus(uploadDocChunk);
         for (const r of uploadUpdateStatusResults) {
           if (!r["Success"]) {
-            let ix = this.rDocId2Ent[r["ID"]];
-            let s = this.rDocList[ix];
+            let s = this._serverVersion(r);
             Logger.log(`Failed to update status '${s["VissibleName"]}': ${r["Message"]}`)
           }
         }
