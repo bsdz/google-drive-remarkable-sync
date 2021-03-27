@@ -1,9 +1,8 @@
-
 const rCacheFname = 'RmCache.json';
 
 const rDeviceTokenKey = "__REMARKABLE_DEVICE_TOKEN__";
 const rDeviceIdKey = "__REMARKABLE_DEVICE_ID__";
-const availableModes = ["mirror", "update"];
+const availableModes = ["mirror", "update", "2way", "2way-full"];
 
 // https://stackoverflow.com/questions/23013573/swap-key-with-value-json/54207992#54207992
 const reverseDict = (o, r = {}) => Object.keys(o).map(x => r[o[x]] = x) && r;
@@ -77,7 +76,6 @@ class Cache {
     this.file = _ensureFile(srcFname, folder);
     this.cache = _listToIdDict(this.file);
   }
-  
   save(rDocList) {
     let cacheBlob = Utilities.newBlob(JSON.stringify(rDocList));
     this.file = Drive.Files.update({
@@ -89,7 +87,7 @@ class Cache {
   }
 }
 
-/*  Main work here. Walks Google Drive then uploads 
+/*  Main work here. Walks Google Drive then uploads
  folder and files to Remarkable cloud storage. Currently
  only uploads PDFs/EPUBs. There appears to be a limitation
  with Remarkable that files must be less than 50MB so
@@ -108,7 +106,7 @@ syncMode - "mirror" or "update" (default). Mirroring will delete files
 gdFolderSkipList - Optional list of folder names to skip from syncing
 forceUpdateFunc - Optional function of obj dictionaries, the first generated
                   from Google Drive, the second from Remarkable storage. The
-                  function returns true/false and determines whether you 
+                  function returns true/false and determines whether you
                   wish to bump up the version and force push.
 
 */
@@ -127,6 +125,7 @@ class Synchronizer {
       }
     }
 
+    this.cacheInfo = new Cache(rCacheFname, this.gdFolder);
     this.gdFolderSkipList = gdFolderSkipList;
     this.forceUpdateFunc = forceUpdateFunc || ((r, s) => false);
     // we borrow terminology from https://freefilesync.org/manual.php?topic=synchronization-settings
@@ -205,7 +204,7 @@ class Synchronizer {
       gdFileObj = DriveApp.getFileById(gdFileObj.getTargetId());
       gdFileMT = gdFileObj.getMimeType();
     }
-    
+
     let zipBlob = null;
 
     if (gdFileMT == MimeType.FOLDER) {
@@ -234,13 +233,14 @@ class Synchronizer {
   }
 
   gdWalk(top, rParentId) {
+    let uploadDocList = [];
     if (this.gdFolderSkipList.includes(top.getName())) {
       Logger.log(`Skipping Google Drive sub folder '${top.getName()}'`);
       return;
     }
     Logger.log(`Scanning Google Drive sub folder '${top.getName()}'`)
     let topUUID = this.getUUID(top.getId());
-    this.uploadDocList.push({
+    uploadDocList.push({
       "ID": topUUID,
       "Type": "CollectionType",
       "Parent": rParentId,
@@ -253,7 +253,7 @@ class Synchronizer {
     let files = top.getFiles();
     while (files.hasNext()) {
       let file = files.next();
-      this.uploadDocList.push({
+      uploadDocList.push({
         "ID": this.getUUID(file.getId()),
         "Type": "DocumentType",
         "Parent": topUUID,
@@ -269,26 +269,27 @@ class Synchronizer {
       let folder = folders.next();
       this.gdWalk(folder, topUUID);
     }
+    return uploadDocList;
   }
-  
+
   _serverVersion(r) {
     let ix = this.rDocId2Ent[r.ID];
     return ix === undefined ? undefined : this.rDocList[ix];
   }
-  
+
   // filter for upload list
   _needsUpdate(r) {
     if (r["ID"] in this.rDocId2Ent) {
       let s = this._serverVersion(r);
       if (this.forceUpdateFunc(r, s)) {
-        // bump up to server version 
+        // bump up to server version
         r["Version"] = s["Version"] + 1;
         return true;
       }
 
       // verbose so can set breakpoints
       if (s["Parent"] != r["Parent"] || s["VissibleName"] != r["VissibleName"]) {
-        // bump up to server version 
+        // bump up to server version
         r["Version"] = s["Version"] + 1;
         r["CurrentPage"] = s["CurrentPage"];
         return true;
@@ -298,8 +299,8 @@ class Synchronizer {
     }
     else {
       // 50MB = 50 * 1024*1024 = 52428800
-      if (r["Type"] == "DocumentType" 
-          && (r["VissibleName"].endsWith("pdf") || r["VissibleName"].endsWith("epub")) 
+      if (r["Type"] == "DocumentType"
+          && (r["VissibleName"].endsWith("pdf") || r["VissibleName"].endsWith("epub"))
           && r["_gdSize"] <= 52428800) {
         return true;
       } else if (r["Type"] == "CollectionType") {
@@ -324,82 +325,99 @@ class Synchronizer {
   }
 
   // Cache examples to a JSON file; download zips for all updated `.bin`s.
-  downloadUpdates(cacheInfo, rDocList) {  
+  downloadUpdates(rDocList) {
+    let updatedRmIds = [];
     for (let rDoc of rDocList) {
       // TODO(tk) not sure what !Success means in RM response.
       if (!rDoc.Success || rDoc.Type != 'DocumentType')
         continue;
-      let cachedDoc = cacheInfo.cache[rDoc.ID];
-      // TODO(tk) default behavior is to download if no cached doc present.
-      // TODO(tk) also would be useful to notice file move on RM?
-      // Something like: this.UUIDToGdId[cachedDoc.Parent] -> old
+      let cachedDoc = this.cacheInfo.cache[rDoc.ID];
       if (!cachedDoc || rDoc.Version > cachedDoc.Version) {
         Logger.info(
-          `Downloading blob update for file 
+          `Downloading blob update for file
           ${rDoc.VissibleName} (v${rDoc.Version})...`);
 
-        let gdParentId = this.UUIDToGdId[rDoc.Parent];
-        let parentFolder = gdParentId
-          ? DriveApp.getFolderById(gdParentId)
-          : this.gdFolder;
+        // TODO(tk) this assumes GDrive already has a folder with given name
+        // If user creates new RM folder, won't work.
+        let gdNewParentId = this.UUIDToGdId[rDoc.Parent];
+        let gdNewParentFolder = gdNewParentId
+          ? DriveApp.getFolderById(gdNewParentId)
+          : this.cacheInfo.folder;
+
+        let gdOldParentId = this.UUIDToGdId[cachedDoc.Parent];
+        let gdOldParentFolder = gdOldParentId
+          ? DriveApp.getFolderById(gdOldParentId)
+          : gdNewParentFolder;
+
         let blob = this.rApiClient.downloadBlob(rDoc);
-        let currentFile = _updateOrCreateBlob(parentFolder, blob);
-        
+        let currentBinFile = _updateOrCreate(gdOldParentFolder, blob);
+        currentBinFile.moveTo(gdNewParentFolder);
+
+        // NOTE(tk) ID could be null If PDF was never on GDrive.
+        // NOTE(tk) file could be null if perma-deleted on GDrive.
+        let gdPdfFileId = this.UUIDToGdId[rDoc.ID];
+        let gdPdfFile = gdPdfFileId && DriveApp.getFileById(gdPdfFileId);
+        if (gdPdfFile && gdOldParentId != gdNewParentId) {
+          Logger.log(
+            `Moving file from ${gdOldParentFolder.getName()}
+            to ${gdNewParentFolder.getName()}`);
+          gdPdfFile.moveTo(gdNewParentFolder);
+        }
+
+        updatedRmIds.push(rDoc.ID);
+
         Drive.Properties.insert({
           key: 'Version',
           value: rDoc.Version,
           visibility: 'PRIVATE'
-        }, currentFile.getId());
+        }, currentBinFile.getId());
       }
     }
+    return updatedRmIds;
   }
 
   run() {
     try {
-      // store all objects in this
-      this.uploadDocList = [];
-
       // generate list from google drive
-      Logger.log(`Scanning Google Drive folder '${this.gdFolder.getName()}'..`)
-      this.gdWalk(this.gdFolder, this.rRootFolderId);
-      Logger.log(`Found ${this.uploadDocList.length} items in Google Drive folder.`)
-
-      // for debugging - dump upload doc list as json in root google drive folder
-      //DriveApp.createFile('googleDriveDocList.json', JSON.stringify(this.uploadDocList));
-
-      // save new user properties
+      Logger.log(`Scanning Google Drive folder '${this.gdFolder.getName()}'...`)
+      this.uploadDocList = this.gdWalk(this.gdFolder, this.rRootFolderId);
       this.userProps.setProperties(this.gdIdToUUID);
-      
-      let rDescIds = new Set(this.rAllDescendantIds());
-      let diff = new Set();
-      
-      Logger.log(`In ${this.syncMode} mode.`); 
-      if (this.syncMode === "mirror") {
+
+      Logger.log(`${this.uploadDocList.length} items in Google Drive folder.`)
+      Logger.log(`Sync mode: ${this.syncMode}.`);
+
+      let updated = new Set();
+      let rDescIdsList = this.rAllDescendantIds();
+      if (["2way", "2way-full"].includes(this.syncMode)) {
+        Logger.log('Downloading updates from ReMarkable.');
+        // 2way-full will also backup RM files not on GDrive
+        let rDocList = this.syncMode === "2way-full" ? this.rDocList : rDescIdsList;
+        try {
+          updated = new Set(this.downloadUpdates(rDocList));
+          this.cacheInfo.save(rDocList);
+        } catch (err) {
+          Logger.log(`Download failed with err ${err}.`);
+        }
+      }
+
+      let rDescIds = new Set(rDescIdsList);
+      if (["mirror", "2way", "2way-full"].includes(this.syncMode)) {
         Logger.log("Deleting files on Remarkable not on Google Drive.");
-        let gdIds = new Set(this.uploadDocList.map((r) => r.ID));
-        diff = rDescIds.difference(gdIds);
-        let deleteList = this.rDocList.filter((r) => diff.has(r.ID));
+        let gdIds = new Set(this.uploadDocList.map(r => r.ID));
+        let diff = rDescIds.difference(gdIds);
+        let deleteList = this.rDocList.filter(
+          r => !updated.has(r.ID) && diff.has(r.ID));
         deleteList.forEach((r) => {
-          Logger.log(`Adding for deletion: ${r["VissibleName"]}`);
+          Logger.log(`Adding for deletion: ${r.VissibleName}`);
         });
         if (deleteList.length > 0) {
           Logger.log(`Deleting ${deleteList.length} docs that no longer exist in Google Drive`);
           this.rApiClient.delete(deleteList);
         }
       }
-      
-      try {
-        Logger.log('Downloading updates from ReMarkable.');
-        let cacheInfo = new Cache(rCacheFname, this.gdFolder);
-        let nonDeleteList = this.rDocList.filter(r => !diff.has(r.ID));
-        this.downloadUpdates(cacheInfo, nonDeleteList);
-        cacheInfo.save(rDocList);
-      } catch (err) {
-        Logger.log(`Download failed with err ${err}.`);
-      }
 
       // filter those that need update
-      let updateDocList = this.uploadDocList.filter((r) => this._needsUpdate(r));
+      let updateDocList = this.uploadDocList.filter(r => this._needsUpdate(r));
       Logger.log(`Updating ${updateDocList.length} documents and folders..`)
 
       // chunk into 5 files at a time a loop
