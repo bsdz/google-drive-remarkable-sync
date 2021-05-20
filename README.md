@@ -11,7 +11,7 @@ Thanks to splitbrain who did the [initial reverse engineering of Remarkable's cl
 Click in menu "File/Rename" and provide suitable name, eg "Sync Google Drive Books to Remarkable".
 
     1. Option 1 - Include library from Apps Script
-Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBXAwFAOv3U-WUUm_n3_nENg7n6BrDDzze7EekBD9vmf-0" without the double quotes. In version drop down choose "Stable - include epub and shortcuts" Then press "Save" button.
+Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBXAwFAOv3U-WUUm_n3_nENg7n6BrDDzze7EekBD9vmf-0" without the double quotes. In version drop down choose "Stable" or version "14" Then press "Save" button.
 
     2. Option 2 - Copy the code files from this repository into your Apps Script project being careful to rename the *.js files to *.gs files.
 
@@ -37,6 +37,17 @@ Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBX
 6. Set up a regular trigger by click in menu "Edit/Current project's triggers". Click "+ Add Trigger" button. Choose run_sync function and select "Time-driver", "Hour timer", "Every hour" and "Notify me daily" then press Save.
 
 That should be it!
+    
+# Troubleshooting
+
+1. If you need to reset your authentication credentials, in your Code.gs paste the following code:
+
+        function reset() {
+         RemarkableGoogleDriveSyncLib.resetRemarkableDevice(); 
+        }
+    
+    Run the above reset function and update the rOneTimeCode with a new obtained from Remarkable's devices page.
+    
 
 # Limitations
 
