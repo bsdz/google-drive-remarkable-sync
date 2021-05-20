@@ -1,7 +1,9 @@
+AUTH_HOST = "https://webapp-production-dot-remarkable-production.appspot.com";
+
 class RemarkableAPI {
 
   constructor(deviceId = null, deviceToken = null, oneTimeCode = null) {
-    // oneTimeCode from https://my.remarkable.com/connect/mobile
+    // oneTimeCode from ${AUTH_HOST}/connect/mobile
     if (deviceToken === null && oneTimeCode === null) {
       throw "Need at least either device-token or one-time-code";
     }
@@ -28,6 +30,7 @@ class RemarkableAPI {
     this.storageHost = this.constructor._getStorageHost(this.userToken);
   }
 
+
   // https://github.com/splitbrain/ReMarkableAPI/wiki/Authentication
 
   static _getDeviceToken(deviceId, oneTimeCode) {
@@ -42,7 +45,7 @@ class RemarkableAPI {
       'payload': JSON.stringify(data)
     };
     // https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app
-    let response = UrlFetchApp.fetch('https://my.remarkable.com/token/json/2/device/new', options);
+    let response = UrlFetchApp.fetch(`${AUTH_HOST}/token/json/2/device/new`, options);
     let deviceToken = response.getContentText()
     //Logger.log(`Received device token: ${deviceToken}`);
     return deviceToken;
@@ -57,7 +60,7 @@ class RemarkableAPI {
         'Authorization': `Bearer ${deviceToken}`
       }
     };
-    let response = UrlFetchApp.fetch('https://my.remarkable.com/token/json/2/user/new', options);
+    let response = UrlFetchApp.fetch(`${AUTH_HOST}/token/json/2/user/new`, options);
     let userToken = response.getContentText()
     //Logger.log(`Received user Token: ${userToken}`);
     return userToken;
