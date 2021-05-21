@@ -175,26 +175,12 @@ class Synchronizer {
     return zipBlob;
   }
 
-  gdWalk(top, rParentId, isRoot) {
+  gdWalk(top, rParentId) {
     if (this.gdFolderSkipList.includes(top.getName())) {
       Logger.log(`Skipping Google Drive sub folder '${top.getName()}'`);
       return;
     }
     Logger.log(`Scanning Google Drive sub folder '${top.getName()}'`)
-    let topUUID = this.getUUID(top.getId());
-    if (!isRoot) {
-      this.uploadDocList.push({
-        "ID": topUUID,
-        "Type": "CollectionType",
-        "Parent": rParentId,
-        "VissibleName": top.getName(),
-        "Version": 1,
-        "_gdId": top.getId(),
-        "_gdSize": top.getSize(),
-      });
-    } else {
-      topUUID = rParentId;
-    }
 
     let files = top.getFiles();
     while (files.hasNext()) {
@@ -202,7 +188,7 @@ class Synchronizer {
       this.uploadDocList.push({
         "ID": this.getUUID(file.getId()),
         "Type": "DocumentType",
-        "Parent": topUUID,
+        "Parent": rParentId,
         "VissibleName": file.getName(),
         "Version": 1,
         "_gdId": file.getId(),
@@ -210,10 +196,21 @@ class Synchronizer {
       });
     }
 
+    let topUUID = this.getUUID(top.getId());
     let folders = top.getFolders();
     while (folders.hasNext()) {
       let folder = folders.next();
-      this.gdWalk(folder, topUUID, false);
+      let folderUUID = this.getUUID(folder);
+      this.uploadDocList.push({
+        "ID": folderUUID,
+        "Type": "CollectionType",
+        "Parent": topUUID,
+        "VissibleName": folder.getName(),
+        "Version": 1,
+        "_gdId": folder.getId(),
+        "_gdSize": folder.getSize(),
+      });
+      this.gdWalk(folder, topUUID);
     }
 
   }
@@ -275,7 +272,7 @@ class Synchronizer {
 
       // generate list from google drive
       Logger.log(`Scanning Google Drive folder '${this.gdFolder.getName()}'..`)
-      this.gdWalk(this.gdFolder, this.rRootFolderId, true);
+      this.gdWalk(this.gdFolder, this.rRootFolderId);
       Logger.log(`Found ${this.uploadDocList.length} items in Google Drive folder.`)
 
       // for debugging - dump upload doc list as json in root google drive folder
