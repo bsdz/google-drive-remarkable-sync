@@ -175,22 +175,26 @@ class Synchronizer {
     return zipBlob;
   }
 
-  gdWalk(top, rParentId) {
+  gdWalk(top, rParentId, isRoot) {
     if (this.gdFolderSkipList.includes(top.getName())) {
       Logger.log(`Skipping Google Drive sub folder '${top.getName()}'`);
       return;
     }
     Logger.log(`Scanning Google Drive sub folder '${top.getName()}'`)
     let topUUID = this.getUUID(top.getId());
-    this.uploadDocList.push({
-      "ID": topUUID,
-      "Type": "CollectionType",
-      "Parent": rParentId,
-      "VissibleName": top.getName(),
-      "Version": 1,
-      "_gdId": top.getId(),
-      "_gdSize": top.getSize(),
-    });
+    if (!isRoot) {
+      this.uploadDocList.push({
+        "ID": topUUID,
+        "Type": "CollectionType",
+        "Parent": rParentId,
+        "VissibleName": top.getName(),
+        "Version": 1,
+        "_gdId": top.getId(),
+        "_gdSize": top.getSize(),
+      });
+    } else {
+      topUUID = rParentId;
+    }
 
     let files = top.getFiles();
     while (files.hasNext()) {
@@ -209,7 +213,7 @@ class Synchronizer {
     let folders = top.getFolders();
     while (folders.hasNext()) {
       let folder = folders.next();
-      this.gdWalk(folder, topUUID);
+      this.gdWalk(folder, topUUID, false);
     }
 
   }
@@ -271,7 +275,7 @@ class Synchronizer {
 
       // generate list from google drive
       Logger.log(`Scanning Google Drive folder '${this.gdFolder.getName()}'..`)
-      this.gdWalk(this.gdFolder, this.rRootFolderId);
+      this.gdWalk(this.gdFolder, this.rRootFolderId, true);
       Logger.log(`Found ${this.uploadDocList.length} items in Google Drive folder.`)
 
       // for debugging - dump upload doc list as json in root google drive folder
