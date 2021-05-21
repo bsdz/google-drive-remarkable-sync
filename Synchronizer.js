@@ -181,16 +181,6 @@ class Synchronizer {
       return;
     }
     Logger.log(`Scanning Google Drive sub folder '${top.getName()}'`)
-    let topUUID = this.getUUID(top.getId());
-    this.uploadDocList.push({
-      "ID": topUUID,
-      "Type": "CollectionType",
-      "Parent": rParentId,
-      "VissibleName": top.getName(),
-      "Version": 1,
-      "_gdId": top.getId(),
-      "_gdSize": top.getSize(),
-    });
 
     let files = top.getFiles();
     while (files.hasNext()) {
@@ -198,7 +188,7 @@ class Synchronizer {
       this.uploadDocList.push({
         "ID": this.getUUID(file.getId()),
         "Type": "DocumentType",
-        "Parent": topUUID,
+        "Parent": rParentId,
         "VissibleName": file.getName(),
         "Version": 1,
         "_gdId": file.getId(),
@@ -206,9 +196,20 @@ class Synchronizer {
       });
     }
 
+    let topUUID = this.getUUID(top.getId());
     let folders = top.getFolders();
     while (folders.hasNext()) {
       let folder = folders.next();
+      let folderUUID = this.getUUID(folder);
+      this.uploadDocList.push({
+        "ID": folderUUID,
+        "Type": "CollectionType",
+        "Parent": topUUID,
+        "VissibleName": folder.getName(),
+        "Version": 1,
+        "_gdId": folder.getId(),
+        "_gdSize": folder.getSize(),
+      });
       this.gdWalk(folder, topUUID);
     }
 
