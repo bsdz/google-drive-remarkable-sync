@@ -3,7 +3,7 @@ AUTH_HOST = "https://webapp-production-dot-remarkable-production.appspot.com";
 class RemarkableAPI {
 
   constructor(deviceId = null, deviceToken = null, oneTimeCode = null) {
-    // oneTimeCode from ${AUTH_HOST}/connect/mobile
+    // oneTimeCode from ${AUTH_HOST}/device/connect/mobile
     if (deviceToken === null && oneTimeCode === null) {
       throw "Need at least either device-token or one-time-code";
     }

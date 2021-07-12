@@ -40,7 +40,7 @@ const availableModes = ["mirror", "update"];
 Arguments:
 
 rOneTimeCode - One time pass code from Remarkable that can typically
-               be generated at https://my.remarkable.com/connect/mobile.
+               be generated at https://my.remarkable.com/device/connect/mobile.
 gdFolderSearchParams - Google Drive search SDK string or folder id.
 rRootFolderName - The root folder in Remarkable device. Currently this
                   must already exist on your device. This can be a remarkable
