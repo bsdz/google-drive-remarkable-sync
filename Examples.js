@@ -1,5 +1,5 @@
 function example_run_sync() {
-  // one time code from https://my.remarkable.com/connect/mobile
+  // one time code from https://my.remarkable.com/device/connect/mobile
   let rOneTimeCode = "abcdwxyz";
   
   // can select google folder by id or using search sdk string
@@ -11,7 +11,7 @@ function example_run_sync() {
 }
 
 function example_force_sync() {
-  // one time code from https://my.remarkable.com/connect/mobile
+  // one time code from https://my.remarkable.com/device/connect/mobile
   let rOneTimeCode = "abcdwxyz";
   
   // can select google folder by id or using search sdk string
@@ -37,7 +37,7 @@ function example_get_document_info() {
   // To re-use a cached device token initialize like this
   // let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, "Google Drive");
   // let rapi = sync.rApiClient;
-  // otherwise use one time code from https://my.remarkable.com/connect/mobile
+  // otherwise use one time code from https://my.remarkable.com/device/connect/mobile
   let rOneTimeCode = "abcdwxyz"; 
   let rapi = new RemarkableAPI(null, null, rOneTimeCode);
   // example doc with uuid
@@ -48,7 +48,7 @@ function example_delete_all_documents() {
   // To re-use a cached device token initialize like this
   // let sync = new Synchronizer(rOneTimeCode, gdFolderSearchParams, "Google Drive");
   // let rapi = sync.rApiClient;
-  // otherwise use one time code from https://my.remarkable.com/connect/mobile
+  // otherwise use one time code from https://my.remarkable.com/device/connect/mobile
   let rOneTimeCode = "abcdwxyz"; 
   let rapi = new RemarkableAPI(null, null, rOneTimeCode);
   let allDocs = rapi.listDocs();

@@ -20,14 +20,14 @@ Click in menu "Resources/Libraries" and in "Add a library" paste "1_ftsHelqnCqBX
 3. In your Code.gs file paste the following code:
 
         function run_sync() {
-          // one time code from https://my.remarkable.com/connect/mobile
+          // one time code from https://my.remarkable.com/device/connect/mobile
           let rOneTimeCode = "abcdwxyz";
           let gdFolderSearchParams = "title = 'Books' and mimeType = 'application/vnd.google-apps.folder'";
           let syncMode = "mirror";
           RemarkableGoogleDriveSyncLib.syncGoogleDriveWithRemarkableCloud(rOneTimeCode, gdFolderSearchParams, "Google Drive", syncMode);
         }
 
-    Change the rOneTimeCode to include a one time code obtained from https://my.remarkable.com/connect/mobile. Also change the name "Books" in gdFolderSearchParams to the name of your Google Drive folder that contains your relevant PDFs. You can also replace the gdFolderSearchParams with a Google Drive folder ID. syncMode can be either "update" or "mirror" with
+    Change the rOneTimeCode to include a one time code obtained from https://my.remarkable.com/device/connect/mobile. Also change the name "Books" in gdFolderSearchParams to the name of your Google Drive folder that contains your relevant PDFs. You can also replace the gdFolderSearchParams with a Google Drive folder ID. syncMode can be either "update" or "mirror" with
     mirroring also deleting files from Remarkable device if not found in same location on Google Drive.
 
 4. Click the menu "Run/Run function/run_sync"; you will be prompted for Authorization. Click Review Permissions and select your Google account. You will be prompted that the app isn't verified. Click the Advanced hyperlink and choose "Go to <Your project name> (unsafe)". Choose Allow to the permissions shown.
