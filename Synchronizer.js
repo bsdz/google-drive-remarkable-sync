@@ -300,52 +300,59 @@ class Synchronizer {
       let updateDocList = this.uploadDocList.filter((r) => this._needsUpdate(r));
       Logger.log(`Updating ${updateDocList.length} documents and folders..`)
 
-      // chunk into 5 files at a time a loop
-      for (const uploadDocChunk of chunk(updateDocList, 5)) {
-        Logger.info(`Processing chunk of size ${uploadDocChunk.length}..`)
+      if (this.rApiClient.storageAPI instanceof RemarkableStorage10API) {
 
-        // extract data for registration
-        let uploadRequestResults = this.rApiClient.uploadRequest(uploadDocChunk);
+        // chunk into 5 files at a time a loop
+        for (const uploadDocChunk of chunk(updateDocList, 5)) {
+          Logger.info(`Processing chunk of size ${uploadDocChunk.length}..`)
 
-        // upload files
-        let deleteDocList = [];
-        for (const doc of uploadRequestResults) {
-          if (doc["Success"]) {
-            try {
-              let gdFileId = this.UUIDToGdId[doc["ID"]];
-              let gdFileObj = DriveApp.getFileById(gdFileId);
-              Logger.log(`Attempting to upload '${gdFileObj.getName()}'; size ${gdFileObj.getSize()} bytes`);
-              let gdFileBlob = this.generateZipBlob(gdFileId);
-              Logger.log(`Generated Remarkable zip blob for '${gdFileObj.getName()}'`);
-              this.rApiClient.blobUpload(doc["BlobURLPut"], gdFileBlob);
-              Logger.log(`Uploaded '${gdFileObj.getName()}'`);
-            }
-            catch (err) {
-              Logger.log(`Failed to upload '${doc["ID"]}': ${err}`);
-              deleteDocList.push(doc);
+          // extract data for registration
+          let uploadRequestResults = this.rApiClient.uploadRequest(uploadDocChunk);
+
+          // upload files
+          let deleteDocList = [];
+          for (const doc of uploadRequestResults) {
+            if (doc["Success"]) {
+              try {
+                let gdFileId = this.UUIDToGdId[doc["ID"]];
+                let gdFileObj = DriveApp.getFileById(gdFileId);
+                Logger.log(`Attempting to upload '${gdFileObj.getName()}'; size ${gdFileObj.getSize()} bytes`);
+                let gdFileBlob = this.generateZipBlob(gdFileId);
+                Logger.log(`Generated Remarkable zip blob for '${gdFileObj.getName()}'`);
+                this.rApiClient.blobUpload(doc["BlobURLPut"], gdFileBlob);
+                Logger.log(`Uploaded '${gdFileObj.getName()}'`);
+              }
+              catch (err) {
+                Logger.log(`Failed to upload '${doc["ID"]}': ${err}`);
+                deleteDocList.push(doc);
+              }
             }
           }
-        }
 
-        // update metadata
-        Logger.info("Updating meta data for chunk");
-        let uploadUpdateStatusResults = this.rApiClient.uploadUpdateStatus(uploadDocChunk);
-        for (const r of uploadUpdateStatusResults) {
-          if (!r["Success"]) {
-            let ix = this.rDocId2Ent[r["ID"]];
-            let s = this.rDocList[ix];
-            Logger.log(`Failed to update status '${s["VissibleName"]}': ${r["Message"]}`)
+          // update metadata
+          Logger.info("Updating meta data for chunk");
+          let uploadUpdateStatusResults = this.rApiClient.uploadUpdateStatus(uploadDocChunk);
+          for (const r of uploadUpdateStatusResults) {
+            if (!r["Success"]) {
+              let ix = this.rDocId2Ent[r["ID"]];
+              let s = this.rDocList[ix];
+              Logger.log(`Failed to update status '${s["VissibleName"]}': ${r["Message"]}`)
+            }
           }
+
+          // delete failed uploads
+          // do this after meta data update to ensure version matches.
+          if (deleteDocList.length > 0) {
+            Logger.log(`Deleting ${deleteDocList.length} docs that failed to upload`);
+            this.rApiClient.delete(deleteDocList);
+          }
+
+          Logger.info("Finished processing chunk.");
         }
 
-        // delete failed uploads
-        // do this after meta data update to ensure version matches.
-        if (deleteDocList.length > 0) {
-          Logger.log(`Deleting ${deleteDocList.length} docs that failed to upload`);
-          this.rApiClient.delete(deleteDocList);
-        }
-
-        Logger.info("Finished processing chunk.");
+      }
+      else if (this.rApiClient.storageAPI instanceof RemarkableStorage15API) {
+        Logger.log("New APU")
       }
 
       Logger.info("Finished running!");
