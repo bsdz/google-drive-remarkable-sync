@@ -1,3 +1,5 @@
+**I've archived this project since Remarkable changed their backend API. There's an [experimental branch](https://github.com/bsdz/google-drive-remarkable-sync/tree/remarkable_15_api) with partial support for the new API if any one is interested in continuing from there. Alternatively, you might wish to try using [rmapi](https://github.com/juruen/rmapi) in combination with [rclone](https://rclone.org/).**
+
 # google-drive-remarkable-sync
 Apps Script library for synchronising Google Drive folder with Remarkable cloud storage.
 
